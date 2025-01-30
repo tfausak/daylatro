@@ -10,12 +10,32 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    container: ghcr.io/tfausak/docker-haskell:9.12.1
     steps:
       - uses: actions/checkout@v4
+      - run: mkdir artifact
+      - uses: haskell/ghcup-setup@v1
+        with:
+          ghc: 9.12.1
+          cabal: latest
+      - run: ghc-pkg list
       - run: cabal update
+      - run: cabal sdist --output-dir artifact
+      - run: cabal configure --flags=pedantic --jobs
+      - run: cat cabal.project.local
+      - run: cp cabal.project.local artifact
+      - run: cabal freeze
+      - run: cat cabal.project.freeze
+      - run: cp cabal.project.freeze artifact
+      - run: cabal outdated --v2-freeze-file
+      - run: cabal build --only-download
+      - run: cabal build --only-dependencies
       - run: cabal build
-      # TODO
+      - run: cp $( cabal list-bin daylatro ) artifact
+      - run: tar --create --file artifact.tar --verbose artifact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daylatro-${{ github.sha }}
+          path: artifact.tar
   cabal:
     name: Cabal
     runs-on: ubuntu-latest
