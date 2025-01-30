@@ -26,6 +26,10 @@ jobs:
       - run: cabal freeze
       - run: cat cabal.project.freeze
       - run: cp cabal.project.freeze artifact
+      - uses: actions/cache@v4
+        with:
+          key: ${{ hashFiles('cabal.project.freeze') }}
+          path: ~/.local/state/cabal
       - run: cabal outdated --v2-freeze-file
       - run: cabal build --only-download
       - run: cabal build --only-dependencies

@@ -13,4 +13,4 @@ FROM scratch
 COPY --from=0 /home/vscode/daylatro /
 ENV PORT=8080
 EXPOSE $PORT
-CMD [ "/daylatro" ]
+CMD [ "/daylatro", "--database=daylatro.sqlite3", "--host=*", "--port=8080" ]
