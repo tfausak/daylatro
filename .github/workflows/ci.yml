@@ -1,0 +1,58 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # TODO
+    strategy:
+      matrix:
+        include:
+          - ghc: '9.10'
+            os: macos-13
+          - ghc: '9.10'
+            os: macos-14
+          - ghc: 9.6
+            os: ubuntu-22.04
+          - ghc: 9.8
+            os: ubuntu-22.04
+          - ghc: '9.10'
+            os: ubuntu-22.04
+          - ghc: '9.10'
+            os: windows-2022
+  cabal:
+    name: Cabal
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cabal check
+  gild:
+    name: Gild
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: tfausak/cabal-gild-setup-action@v2
+      - run: cabal-gild --input daylatro.cabal --mode check
+  hlint:
+    name: HLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/hlint-setup@v2
+      - uses: haskell-actions/hlint-run@v2
+        with:
+          fail-on: status
+  ormolu:
+    name: Ormolu
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: haskell-actions/run-ormolu@v17
