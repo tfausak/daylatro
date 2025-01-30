@@ -219,7 +219,7 @@ application connection request respond = case Wai.pathInfo request of
                       Html.type_ "number"
                     ]
               Html.button_ [Html.type_ "submit"] "Submit"
-            Monad.when (not $ null scores) . Html.table_ $ do
+            Monad.unless (null scores) . Html.table_ $ do
               Html.thead_ . Html.tr_ $ do
                 Html.th_ "Name"
                 Html.th_ "Ante"
