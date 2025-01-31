@@ -19,6 +19,7 @@ import qualified Formatting as F
 import qualified Formatting.Time as F
 import qualified Lucid as Html
 import qualified Network.HTTP.Types as Http
+import qualified Network.URI as Uri
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified PackageInfo_daylatro as Package
@@ -59,6 +60,7 @@ mainWith arguments = do
       connection
       "create table if not exists Score \
       \ ( key integer primary key \
+      \ , createdAt text not null \
       \ , day text not null \
       \ , name text not null \
       \ , ante integer not null \
@@ -232,6 +234,7 @@ application connection request respond = case Wai.pathInfo request of
         . htmlResponse Http.ok200 []
         $ template header content
     Right Http.POST -> do
+      now <- Time.getCurrentTime
       query <- Http.parseQueryText . LazyByteString.toStrict <$> Wai.consumeRequestBodyLazy request
       let maybeScore = do
             day <-
@@ -239,9 +242,9 @@ application connection request respond = case Wai.pathInfo request of
                 . maybe "" Text.unpack
                 . Monad.join
                 $ lookup "day" query
-            name <- Monad.join $ lookup "name" query
+            name <- fmap (Text.map Char.toUpper) . Monad.join $ lookup "name" query
             Monad.guard . between 1 3 $ Text.length name
-            Monad.guard $ Text.all (\c -> between 'A' 'Z' c || between 'a' 'z' c || between '0' '9' c) name
+            Monad.guard $ Text.all (\c -> between 'A' 'Z' c || between '0' '9' c) name
             ante <-
               Read.readMaybe
                 . maybe "" Text.unpack
@@ -260,8 +263,9 @@ application connection request respond = case Wai.pathInfo request of
             Monad.guard $ maybe True (not . isInfinite) bestHand
             pure
               MkScore
-                { scoreDay = day,
-                  scoreName = Text.map Char.toUpper name,
+                { scoreCreatedAt = now,
+                  scoreDay = day,
+                  scoreName = name,
                   scoreAnte = ante,
                   scoreBestHand = bestHand
                 }
@@ -270,7 +274,8 @@ application connection request respond = case Wai.pathInfo request of
         Just score -> do
           Sql.execute
             connection
-            "insert into Score (day, name, ante, bestHand) values (?, ?, ?, ?)"
+            "insert into Score (createdAt, day, name, ante, bestHand) \
+            \ values (?, ?, ?, ?, ?)"
             score
           respond $
             statusResponse
@@ -334,6 +339,11 @@ template header content = do
     Html.head_ $ do
       Html.meta_ [Html.charset_ "utf-8"]
       Html.meta_ [Html.name_ "viewport", Html.content_ "initial-scale = 1, width = device-width"]
+      Html.link_
+        [ Html.href_ . Text.pack $ "data:image/svg+xml," <> Uri.escapeURIString Uri.isUnescapedInURIComponent "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'><text x='1' y='15'>&#x1f0cf;</text></svg>",
+          Html.rel_ "icon",
+          Html.type_ "image/svg+xml"
+        ]
       Html.title_ "Daylatro"
       header
     Html.body_ $ do
@@ -341,9 +351,12 @@ template header content = do
         . Html.h1_
         $ Html.a_ [Html.href_ "/"] "Daylatro"
       Html.main_ content
-      Html.footer_
-        . Html.p_
-        $ Html.a_ [Html.href_ "https://github.com/tfausak/daylatro"] "github.com/tfausak/daylatro"
+      Html.footer_ . Html.p_ $ do
+        "Powered by "
+        Html.a_ [Html.href_ "https://github.com/tfausak/daylatro"] "tfausak/daylatro"
+        " version "
+        Html.toHtml $ Version.showVersion Package.version
+        "."
 
 lookupDay :: Wai.Request -> Maybe Time.Day
 lookupDay request = do
@@ -397,7 +410,8 @@ instance Sql.ToField (Key a) where
   toField = Sql.toField . keyValue
 
 data Score = MkScore
-  { scoreDay :: Time.Day,
+  { scoreCreatedAt :: Time.UTCTime,
+    scoreDay :: Time.Day,
     scoreName :: Text.Text,
     scoreAnte :: Int,
     scoreBestHand :: Maybe Double
@@ -406,13 +420,15 @@ data Score = MkScore
 
 instance Sql.FromRow Score where
   fromRow = do
+    createdAt <- Sql.field
     day <- Sql.field
     name <- Sql.field
     ante <- Sql.field
     bestHand <- Sql.field
     pure
       MkScore
-        { scoreDay = day,
+        { scoreCreatedAt = createdAt,
+          scoreDay = day,
           scoreName = name,
           scoreAnte = ante,
           scoreBestHand = bestHand
@@ -421,7 +437,8 @@ instance Sql.FromRow Score where
 instance Sql.ToRow Score where
   toRow score =
     Sql.toRow
-      ( scoreDay score,
+      ( scoreCreatedAt score,
+        scoreDay score,
         scoreName score,
         scoreAnte score,
         scoreBestHand score
