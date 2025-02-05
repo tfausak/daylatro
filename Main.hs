@@ -136,9 +136,17 @@ application connection request respond = case Wai.pathInfo request of
   [] -> case Http.parseMethod $ Wai.requestMethod request of
     Right Http.GET -> do
       today <- fmap Time.utctDay Time.getCurrentTime
-      day <- case lookupDay request of
-        Just d | epoch <= d && d <= today -> pure d
-        _ -> pure today
+      let day = case lookupDay request of
+            Just d | epoch <= d && d <= today -> d
+            _ -> today
+          maybeYesterday =
+            if day == epoch
+              then Nothing
+              else Just $ Time.addDays (-1) day
+          maybeTomorrow =
+            if day == today
+              then Nothing
+              else Just $ Time.addDays 1 day
       scores <-
         Sql.query
           connection
@@ -170,17 +178,32 @@ application connection request respond = case Wai.pathInfo request of
                 "The "
                 Html.a_ [Html.href_ "https://www.playbalatro.com"] "Balatro"
                 " daily seed for "
+                Monad.forM_ maybeYesterday $ \yesterday -> do
+                  Html.a_
+                    [ Html.href_ . Text.pack $ "/?day=" <> formatDay yesterday,
+                      Html.title_ "yesterday"
+                    ]
+                    "\x2190"
+                  " "
                 Html.input_
                   [ Html.max_ . Text.pack $ formatDay today,
                     Html.min_ . Text.pack $ formatDay epoch,
                     Html.name_ "day",
+                    Html.onchange_ "this.form.submit()",
                     Html.type_ "date",
                     Html.value_ . Text.pack $ formatDay day
                   ]
+                Monad.forM_ maybeTomorrow $ \tomorrow -> do
+                  " "
+                  Html.a_
+                    [ Html.href_ . Text.pack $ "/?day=" <> formatDay tomorrow,
+                      Html.title_ "tomorrow"
+                    ]
+                    "\x2192"
                 " is "
                 Html.code_ $ Html.toHtml seed
                 ". "
-                Html.button_ [Html.type_ "submit"] "Generate"
+                Html.noscript_ $ Html.button_ [Html.type_ "submit"] "Generate"
             Html.form_ [Html.method_ "post"] . Html.fieldset_ $ do
               Html.legend_ "High Score"
               Html.input_
