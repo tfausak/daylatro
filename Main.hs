@@ -527,7 +527,7 @@ myStyle =
         text-decoration: none;
       }
       input { 
-        font: 16px/3em 'Balatro', sans-serif; 
+        font: inherit;
       }
       main {
       }
