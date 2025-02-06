@@ -526,6 +526,9 @@ myStyle =
         color: white;
         text-decoration: none;
       }
+      input { 
+        font: 16px/3em 'Balatro', sans-serif; 
+      }
       main {
       }
       main p {
@@ -534,6 +537,10 @@ myStyle =
       main a {
         color: rgb(0, 147, 255);
         text-decoration: none;
+      }
+      main ul { 
+        list-style-type: none; 
+        padding-left: 0;
       }
       table {
         width: 100%;
@@ -545,6 +552,19 @@ myStyle =
       footer a {
         color: rgb(255, 152, 0);
         text-decoration: none;
+      }
+      button[type="submit"] { 
+        padding: 18px 36px;
+        border-radius: 8px;
+        font-family: Balatro, sans-serif;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        cursor: pointer;
+        background: linear-gradient(to bottom, #ffa500 0%, /* Bright orange at top */ #ff8c00 100% /* Darker orange at bottom */);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -2px 0 rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.2);
+        color: white;
+        text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
       }
       """
     ]
