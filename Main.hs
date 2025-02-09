@@ -7,6 +7,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Lazy as LazyByteString
 import qualified Data.Char as Char
 import Data.Function ((&))
+import qualified Data.Maybe as Maybe
 import qualified Data.String as String
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
@@ -138,13 +139,16 @@ application connection request respond = case Wai.pathInfo request of
     Right Http.GET -> do
       today <- fmap Time.utctDay Time.getCurrentTime
       let day = case lookupDay request of
-            Just d | epoch <= d && d <= today -> d
-            _ -> today
-          maybeYesterday =
+            Just d
+              | d < epoch -> epoch
+              | d > today -> today
+              | otherwise -> d
+            Nothing -> today
+          maybePrevious =
             if day == epoch
               then Nothing
               else Just $ Time.addDays (-1) day
-          maybeTomorrow =
+          maybeNext =
             if day == today
               then Nothing
               else Just $ Time.addDays 1 day
@@ -180,90 +184,90 @@ application connection request respond = case Wai.pathInfo request of
             Html.style_ myStyle
           content :: Html.Html ()
           content = do
-            Html.form_ $ do
-              Html.p_ $ do
-                "The "
-                Html.a_ [Html.href_ "https://www.playbalatro.com"] "Balatro"
-                " daily seed for "
-                Html.br_ []
-                Monad.forM_ maybeYesterday $ \yesterday -> do
+            Html.p_ $ do
+              "The "
+              Html.a_ [Html.href_ "https://www.playbalatro.com"] "Balatro"
+              " daily seed for "
+              Html.br_ []
+              case maybePrevious of
+                Nothing -> "<-"
+                Just previous ->
                   Html.a_
-                    [ Html.href_ . Text.pack $ "/?day=" <> formatDay yesterday,
-                      Html.title_ "previous day"
+                    [ Html.href_ . Text.pack $ "/?day=" <> formatDay previous,
+                      Html.title_ "Go to previous day."
                     ]
-                    "\x2190"
-                  " "
-                Html.input_
-                  [ Html.max_ . Text.pack $ formatDay today,
-                    Html.min_ . Text.pack $ formatDay epoch,
-                    Html.name_ "day",
-                    Html.onchange_ "this.form.submit()",
-                    Html.type_ "date",
-                    Html.value_ . Text.pack $ formatDay day
-                  ]
-                Monad.forM_ maybeTomorrow $ \tomorrow -> do
-                  " "
+                    "<-"
+              " "
+              Html.toHtml $ formatDay day
+              " "
+              case maybeNext of
+                Nothing -> "->"
+                Just next ->
                   Html.a_
-                    [ Html.href_ . Text.pack $ "/?day=" <> formatDay tomorrow,
-                      Html.title_ "next day"
+                    [ Html.href_ . Text.pack $ "/?day=" <> formatDay next,
+                      Html.title_ "Go to next day."
                     ]
-                    "\x2192"
-                Html.br_ []
-                " is "
-                Html.toHtml seed
-                "."
-                Html.noscript_ $ do
-                  " "
-                  Html.button_ [Html.type_ "submit"] "Generate"
-            Html.form_ [Html.method_ "post"] . Html.fieldset_ $ do
-              Html.legend_ "High Score"
+                    "->"
+              Html.br_ []
+              " is "
+              Html.span_
+                [ Html.onclick_ $ "navigator.clipboard.writeText('" <> Text.pack seed <> "');",
+                  Html.title_ "Click to copy."
+                ]
+                $ Html.toHtml seed
+              "."
+            Html.form_ [Html.method_ "post"] $ do
               Html.input_
                 [ Html.name_ "day",
                   Html.type_ "hidden",
                   Html.value_ . Text.pack $ formatDay day
                 ]
-              Html.ul_ $ do
-                Html.li_ . Html.label_ $ do
-                  "Name: "
-                  Html.input_
-                    [ Html.maxlength_ "3",
-                      Html.minlength_ "1",
-                      Html.name_ "name",
-                      Html.pattern_ "[A-Za-z0-9]+",
-                      Html.placeholder_ "ABC",
-                      Html.required_ "required",
-                      Html.size_ "4"
-                    ]
-                Html.li_ . Html.label_ $ do
-                  "Ante: "
-                  Html.input_
-                    [ Html.max_ "39",
-                      Html.min_ "0",
-                      Html.name_ "ante",
-                      Html.placeholder_ "8",
-                      Html.required_ "required",
-                      Html.size_ "3",
-                      Html.type_ "number"
-                    ]
-                Html.li_ . Html.label_ $ do
-                  "Best Hand: "
-                  Html.input_
-                    [ Html.min_ "0",
-                      Html.name_ "bestHand",
-                      Html.placeholder_ "123456",
-                      Html.size_ "10",
-                      Html.type_ "number"
-                    ]
+              Html.table_ $ do
+                Html.thead_ . Html.tr_ $ do
+                  Html.th_ "Name"
+                  Html.th_ "Ante"
+                  Html.th_ "Best Hand"
+                Html.tbody_ $ do
+                  Monad.forM_ scores $ \score -> Html.tr_ $ do
+                    Html.td_ . Html.toHtml . scoreName $ modelValue score
+                    Html.td_ . Html.toHtml . show . scoreAnte $ modelValue score
+                    Html.td_
+                      . Html.toHtml
+                      . (\x -> Maybe.fromMaybe x $ Text.stripSuffix ".0" x)
+                      . Text.pack
+                      . maybe "" show
+                      . scoreBestHand
+                      $ modelValue score
+                  Html.tr_ $ do
+                    Html.td_ $
+                      Html.input_
+                        [ Html.maxlength_ "3",
+                          Html.minlength_ "1",
+                          Html.name_ "name",
+                          Html.pattern_ "[A-Za-z0-9]+",
+                          Html.placeholder_ "ABC",
+                          Html.required_ "required",
+                          Html.size_ "4"
+                        ]
+                    Html.td_ $
+                      Html.input_
+                        [ Html.max_ "39",
+                          Html.min_ "0",
+                          Html.name_ "ante",
+                          Html.placeholder_ "8",
+                          Html.required_ "required",
+                          Html.size_ "3",
+                          Html.type_ "number"
+                        ]
+                    Html.td_ $
+                      Html.input_
+                        [ Html.min_ "0",
+                          Html.name_ "bestHand",
+                          Html.placeholder_ "123456",
+                          Html.size_ "10",
+                          Html.type_ "number"
+                        ]
               Html.button_ [Html.type_ "submit"] "Submit"
-            Monad.unless (null scores) . Html.table_ $ do
-              Html.thead_ . Html.tr_ $ do
-                Html.th_ "Name"
-                Html.th_ "Ante"
-                Html.th_ "Best Hand"
-              Html.tbody_ . Monad.forM_ scores $ \score -> Html.tr_ $ do
-                Html.td_ . Html.toHtml . scoreName $ modelValue score
-                Html.td_ . Html.toHtml . show . scoreAnte $ modelValue score
-                Html.td_ . Html.toHtml . maybe "" show . scoreBestHand $ modelValue score
       respond
         . htmlResponse Http.ok200 []
         $ template header content
@@ -385,12 +389,9 @@ template header content = do
         . Html.h1_
         $ Html.a_ [Html.href_ "/"] "Daylatro"
       Html.main_ content
-      Html.footer_ . Html.p_ $ do
-        "Powered by "
-        Html.a_ [Html.href_ "https://github.com/tfausak/daylatro"] "tfausak/daylatro"
-        " version "
-        Html.toHtml $ Version.showVersion Package.version
-        "."
+      Html.footer_
+        . Html.p_
+        $ Html.a_ [Html.href_ "https://github.com/tfausak/daylatro"] "tfausak/daylatro"
 
 lookupDay :: Wai.Request -> Maybe Time.Day
 lookupDay request = do
@@ -505,66 +506,59 @@ myStyle =
         background: black;
         color: white;
         font: 16px/3em 'Balatro', sans-serif;
+        letter-spacing: 1px;
+        text-align: center;
+        text-shadow: 0 4px 0 black;
       }
       body {
-        margin: 3em auto;
+        margin: 0 auto;
         max-width: 40em;
+        padding: 0 1.5em;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
       }
       header, main, footer {
-        background: rgb(58, 80, 85);
-        border-radius: 1em;
         margin: 3em 0;
-        padding: 1.5em;
-      }
-      header {
-        text-align: center;
       }
       h1 {
         font-size: 2em;
-      }
-      header a {
-        color: white;
-        text-decoration: none;
-      }
-      input { 
-        font: inherit;
-      }
-      main {
+        margin: 0;
       }
       main p {
-        text-align: center;
+        margin: 1.5em 0;
       }
       main a {
         color: rgb(0, 147, 255);
-        text-decoration: none;
       }
-      main ul { 
-        list-style-type: none; 
-        padding-left: 0;
+      span {
+        cursor: pointer;
       }
       table {
+        text-align: left;
         width: 100%;
       }
-      footer {
-        font-size: 12px;
-        text-align: center;
+      input {
+        display: block;
+        font: inherit;
       }
-      footer a {
-        color: rgb(255, 152, 0);
-        text-decoration: none;
-      }
-      button[type="submit"] { 
-        padding: 18px 36px;
-        border-radius: 8px;
-        font-family: Balatro, sans-serif;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+      button {
+        background: rgb(0, 147, 255);
+        border-radius: 0.5em;
+        border: none;
+        box-shadow: 0 4px 0 black;
+        color: inherit;
         cursor: pointer;
-        background: linear-gradient(to bottom, #ffa500 0%, /* Bright orange at top */ #ff8c00 100% /* Darker orange at bottom */);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -2px 0 rgba(0, 0, 0, 0.2), 0 2px 4px rgba(0, 0, 0, 0.2);
-        color: white;
-        text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+        display: block;
+        font: inherit;
+        margin: 1.5em auto;
+        padding: 1.5em;
+        text-shadow: inherit;
+        text-transform: uppercase;
+      }
+      footer p {
+        margin: 0;
       }
       """
     ]
