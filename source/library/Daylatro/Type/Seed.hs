@@ -6,19 +6,17 @@ import qualified Formatting as F
 import qualified Lucid as H
 import qualified System.Random as Random
 
-newtype Seed
-  = MkSeed Text.Text
+newtype Seed = MkSeed
+  { value :: Text.Text
+  }
   deriving (Eq, Show)
 
 instance H.ToHtml Seed where
-  toHtml = H.toHtml . toText
-  toHtmlRaw = H.toHtmlRaw . toText
-
-toText :: Seed -> Text.Text
-toText (MkSeed x) = x
+  toHtml = H.toHtml . value
+  toHtmlRaw = H.toHtmlRaw . value
 
 format :: F.Format t (Seed -> t)
-format = F.mapf toText F.stext
+format = F.mapf value F.stext
 
 fromDay :: Time.Day -> Seed
 fromDay =

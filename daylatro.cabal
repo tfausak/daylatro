@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: daylatro
-version: 0.2025.7.30
+version: 0.2025.7.31
 synopsis: Generate daily Balatro seeds.
 description:
   Daylatro is a tool for generating daily Balatro seeds and comparing runs
@@ -68,14 +68,24 @@ library
   -- cabal-gild: discover source/library
   exposed-modules:
     Daylatro
+    Daylatro.Application
+    Daylatro.Constant.Balatro
     Daylatro.Constant.Favicon
     Daylatro.Constant.Font
+    Daylatro.Constant.Migration
     Daylatro.Constant.Script
     Daylatro.Constant.Shader
     Daylatro.Constant.Style
     Daylatro.Exception.InvalidOption
     Daylatro.Exception.UnexpectedArgument
     Daylatro.Exception.UnknownOption
+    Daylatro.Extra.Ord
+    Daylatro.Handler.Common
+    Daylatro.Handler.Feed.Get
+    Daylatro.Handler.Index.Get
+    Daylatro.Handler.Index.Post
+    Daylatro.Main
+    Daylatro.Server
     Daylatro.Type.Config
     Daylatro.Type.Context
     Daylatro.Type.Flag
