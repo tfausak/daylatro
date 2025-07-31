@@ -1,3 +1,4 @@
+{-# LANGUAGE MultilineStrings #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Daylatro where
@@ -71,13 +72,15 @@ mainWith arguments = do
     IO.hSetBuffering IO.stdout IO.LineBuffering
     Sql.execute_
       connection
-      "create table if not exists Score \
-      \ ( key integer primary key \
-      \ , createdAt text not null \
-      \ , day text not null \
-      \ , name text not null \
-      \ , ante integer not null \
-      \ , bestHand real )"
+      """
+      create table if not exists Score
+        ( key integer primary key
+        , createdAt text not null
+        , day text not null
+        , name text not null
+        , ante integer not null
+        , bestHand real )
+      """
     Warp.runSettings (settings config) $ application connection config
 
 application :: Sql.Connection -> Config.Config -> Wai.Application
@@ -115,11 +118,13 @@ getIndex connection request respond = do
   scores <-
     Sql.query
       connection
-      "select * \
-      \ from Score \
-      \ where day = ? \
-      \ order by ante desc, bestHand desc \
-      \ limit 10"
+      """
+      select *
+      from Score
+      where day = ?
+      order by ante desc, bestHand desc
+      limit 10
+      """
       [day]
   let seed = Seed.fromDay day
       header :: Html.Html ()
