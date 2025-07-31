@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Daylatro.Type.Config where
 
@@ -6,6 +7,8 @@ import qualified Control.Monad.Catch as Exception
 import qualified Data.String as String
 import qualified Daylatro.Exception.InvalidOption as InvalidOption
 import qualified Daylatro.Type.Flag as Flag
+import Formatting ((%))
+import qualified Formatting as F
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Text.Read as Read
 
@@ -37,6 +40,9 @@ applyFlag config flag = case flag of
   Flag.Help -> pure config {help = True}
   Flag.Host string -> pure config {host = String.fromString string}
   Flag.Port string -> case Read.readMaybe string of
-    Nothing -> Exception.throwM . InvalidOption.MkInvalidOption $ "invalid port: " <> show string
+    Nothing ->
+      Exception.throwM
+        . InvalidOption.MkInvalidOption
+        $ F.formatToString ("invalid port: " % F.shown) string
     Just port -> pure config {port}
   Flag.Version -> pure config {version = True}

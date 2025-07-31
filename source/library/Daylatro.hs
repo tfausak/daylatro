@@ -17,6 +17,7 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Data.Time as Time
 import qualified Data.Version as Version
 import qualified Database.SQLite.Simple as Sql
+import qualified Daylatro.Constant.Favicon as Favicon
 import qualified Daylatro.Constant.Script as Script
 import qualified Daylatro.Constant.Shader as Shader
 import qualified Daylatro.Constant.Style as Style
@@ -158,7 +159,7 @@ getIndex connection request respond = do
             Nothing -> "<-"
             Just previous ->
               Html.a_
-                [ Html.href_ . Text.pack $ "/?day=" <> formatDay previous,
+                [ Html.href_ $ F.sformat ("/?day=" % F.dateDash) previous,
                   Html.title_ "Go to previous day."
                 ]
                 "<-"
@@ -169,14 +170,14 @@ getIndex connection request respond = do
             Nothing -> "->"
             Just next ->
               Html.a_
-                [ Html.href_ . Text.pack $ "/?day=" <> formatDay next,
+                [ Html.href_ $ F.sformat ("/?day=" % F.dateDash) next,
                   Html.title_ "Go to next day."
                 ]
                 "->"
           Html.br_ []
           " is "
           Html.span_
-            [ Html.onclick_ $ "navigator.clipboard.writeText('" <> Seed.toText seed <> "');",
+            [ Html.onclick_ $ F.sformat ("navigator.clipboard.writeText('" % Seed.format % "');") seed,
               Html.title_ "Click to copy."
             ]
             $ Html.toHtml seed
@@ -317,7 +318,7 @@ getFeed config respond = do
                     Xml.Element
                       { Xml.elementName = "id",
                         Xml.elementAttributes = Map.empty,
-                        Xml.elementNodes = [Xml.NodeContent . Text.pack $ Config.baseUrl config <> "/feed.atom"]
+                        Xml.elementNodes = [Xml.NodeContent $ F.sformat (F.string % "/feed.atom") (Config.baseUrl config)]
                       }
                     : Xml.NodeElement
                       Xml.Element
@@ -325,7 +326,7 @@ getFeed config respond = do
                           Xml.elementAttributes =
                             Map.fromList
                               [ ("rel", "self"),
-                                ("href", Text.pack $ Config.baseUrl config <> "/feed.atom")
+                                ("href", F.sformat (F.string % "/feed.atom") (Config.baseUrl config))
                               ],
                           Xml.elementNodes = []
                         }
@@ -357,8 +358,7 @@ getFeed config respond = do
                     : fmap
                       ( \day ->
                           let seed = Seed.fromDay day
-                              date = Text.pack $ Time.formatTime Time.defaultTimeLocale "%Y-%m-%d" day
-                              url = Text.pack (Config.baseUrl config) <> "/?day=" <> date
+                              url = F.sformat (F.string % "/?day=" % F.dateDash) (Config.baseUrl config) day
                            in Xml.NodeElement
                                 Xml.Element
                                   { Xml.elementName = "entry",
@@ -384,13 +384,13 @@ getFeed config respond = do
                                           Xml.Element
                                             { Xml.elementName = "title",
                                               Xml.elementAttributes = Map.empty,
-                                              Xml.elementNodes = [Xml.NodeContent $ "Daily seed for " <> date]
+                                              Xml.elementNodes = [Xml.NodeContent $ F.sformat ("Daily seed for " % F.dateDash) day]
                                             },
                                         Xml.NodeElement
                                           Xml.Element
                                             { Xml.elementName = "updated",
                                               Xml.elementAttributes = Map.empty,
-                                              Xml.elementNodes = [Xml.NodeContent $ date <> "T00:00:00Z"]
+                                              Xml.elementNodes = [Xml.NodeContent $ F.sformat (F.dateDash % "T00:00:00Z") day]
                                             },
                                         Xml.NodeElement
                                           Xml.Element
@@ -462,7 +462,7 @@ template header content = do
       Html.meta_ [Html.charset_ "utf-8"]
       Html.meta_ [Html.name_ "viewport", Html.content_ "initial-scale = 1, width = device-width"]
       Html.link_
-        [ Html.href_ . Text.pack $ "data:image/svg+xml," <> Uri.escapeURIString Uri.isUnescapedInURIComponent "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'><text x='1' y='15'>&#x1f0cf;</text></svg>",
+        [ Html.href_ $ F.sformat ("data:image/svg+xml," % F.string) (Uri.escapeURIString Uri.isUnescapedInURIComponent Favicon.daylatro),
           Html.rel_ "icon",
           Html.type_ "image/svg+xml"
         ]

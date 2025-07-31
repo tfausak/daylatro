@@ -68,6 +68,7 @@ library
   -- cabal-gild: discover source/library
   exposed-modules:
     Daylatro
+    Daylatro.Constant.Favicon
     Daylatro.Constant.Font
     Daylatro.Constant.Script
     Daylatro.Constant.Shader
