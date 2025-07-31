@@ -25,6 +25,7 @@ import qualified Daylatro.Exception.InvalidOption as InvalidOption
 import qualified Daylatro.Exception.UnexpectedArgument as UnexpectedArgument
 import qualified Daylatro.Exception.UnknownOption as UnknownOption
 import qualified Daylatro.Type.Config as Config
+import qualified Daylatro.Type.Context as Context
 import qualified Daylatro.Type.Flag as Flag
 import qualified Daylatro.Type.Model as Model
 import qualified Daylatro.Type.Score as Score
@@ -52,6 +53,8 @@ main = do
 
 mainWith :: [String] -> IO ()
 mainWith arguments = do
+  IO.hSetBuffering IO.stdout IO.LineBuffering
+
   let (flags, args, opts, errs) = GetOpt.getOpt' GetOpt.Permute Flag.options arguments
   Monad.forM_ errs $ Exception.throwM . InvalidOption.MkInvalidOption . Text.pack
   Monad.forM_ opts $ Exception.throwM . UnknownOption.MkUnknownOption . Text.pack
@@ -68,9 +71,9 @@ mainWith arguments = do
     Exit.exitSuccess
 
   Sql.withConnection (Config.database config) $ \connection -> do
-    IO.hSetBuffering IO.stdout IO.LineBuffering
-    mapM_ (Sql.execute_ connection) migrations
-    Warp.runSettings (settings config) $ application connection config
+    let context = Context.fromConfig config connection
+    mapM_ (Sql.execute_ $ Context.connection context) migrations
+    Warp.runSettings (settings context) $ application context
 
 migrations :: [Sql.Query]
 migrations =
@@ -85,23 +88,23 @@ migrations =
     """
   ]
 
-application :: Sql.Connection -> Config.Config -> Wai.Application
-application connection config request respond = case Wai.pathInfo request of
+application :: Context.Context -> Wai.Application
+application context request respond = case Wai.pathInfo request of
   [] -> case Http.parseMethod $ Wai.requestMethod request of
-    Right Http.GET -> getIndex connection request respond
-    Right Http.POST -> postIndex connection request respond
+    Right Http.GET -> getIndex context request respond
+    Right Http.POST -> postIndex context request respond
     _ -> respond $ statusResponse Http.methodNotAllowed405 []
   ["feed.atom"] -> case Http.parseMethod $ Wai.requestMethod request of
-    Right Http.GET -> getFeed config respond
+    Right Http.GET -> getFeed context respond
     _ -> respond $ statusResponse Http.methodNotAllowed405 []
   _ -> respond $ statusResponse Http.notFound404 []
 
 getIndex ::
-  Sql.Connection ->
+  Context.Context ->
   Wai.Request ->
   (Wai.Response -> IO Wai.ResponseReceived) ->
   IO Wai.ResponseReceived
-getIndex connection request respond = do
+getIndex context request respond = do
   today <- fmap Time.utctDay Time.getCurrentTime
   let day = case lookupDay request of
         Just d
@@ -119,7 +122,7 @@ getIndex connection request respond = do
           else Just $ Time.addDays 1 day
   scores <-
     Sql.query
-      connection
+      (Context.connection context)
       """
       select *
       from Score
@@ -240,11 +243,11 @@ getIndex connection request respond = do
     $ template header content
 
 postIndex ::
-  Sql.Connection ->
+  Context.Context ->
   Wai.Request ->
   (Wai.Response -> IO Wai.ResponseReceived) ->
   IO Wai.ResponseReceived
-postIndex connection request respond = do
+postIndex context request respond = do
   now <- Time.getCurrentTime
   query <- Http.parseQueryText . LazyByteString.toStrict <$> Wai.consumeRequestBodyLazy request
   let maybeScore = do
@@ -284,7 +287,7 @@ postIndex connection request respond = do
     Nothing -> respond $ statusResponse Http.badRequest400 []
     Just score -> do
       Sql.execute
-        connection
+        (Context.connection context)
         "insert into Score (createdAt, day, name, ante, bestHand) \
         \ values (?, ?, ?, ?, ?)"
         score
@@ -294,10 +297,10 @@ postIndex connection request respond = do
           [(Http.hLocation, F.formatted Encoding.encodeUtf8 ("/?day=" % F.dateDash) (Score.day score))]
 
 getFeed ::
-  Config.Config ->
+  Context.Context ->
   (Wai.Response -> IO Wai.ResponseReceived) ->
   IO Wai.ResponseReceived
-getFeed config respond = do
+getFeed context respond = do
   today <- fmap Time.utctDay Time.getCurrentTime
   respond
     . Wai.responseLBS Http.ok200 [(Http.hContentType, "application/atom+xml;charset=utf-8")]
@@ -319,7 +322,7 @@ getFeed config respond = do
                     X.Element
                       { X.elementName = "id",
                         X.elementAttributes = Map.empty,
-                        X.elementNodes = [X.NodeContent $ F.sformat (F.stext % "/feed.atom") (Config.baseUrl config)]
+                        X.elementNodes = [X.NodeContent $ F.sformat (F.stext % "/feed.atom") (Context.baseUrl context)]
                       }
                     : X.NodeElement
                       X.Element
@@ -327,7 +330,7 @@ getFeed config respond = do
                           X.elementAttributes =
                             Map.fromList
                               [ ("rel", "self"),
-                                ("href", F.sformat (F.stext % "/feed.atom") (Config.baseUrl config))
+                                ("href", F.sformat (F.stext % "/feed.atom") (Context.baseUrl context))
                               ],
                           X.elementNodes = []
                         }
@@ -359,7 +362,7 @@ getFeed config respond = do
                     : fmap
                       ( \day ->
                           let seed = Seed.fromDay day
-                              url = F.sformat (F.stext % "/?day=" % F.dateDash) (Config.baseUrl config) day
+                              url = F.sformat (F.stext % "/?day=" % F.dateDash) (Context.baseUrl context) day
                            in X.NodeElement
                                 X.Element
                                   { X.elementName = "entry",
@@ -410,10 +413,10 @@ getFeed config respond = do
 between :: (Ord a) => a -> a -> a -> Bool
 between lo hi x = lo <= x && x <= hi
 
-settings :: Config.Config -> Warp.Settings
-settings config =
-  let host = Config.host config
-      port = Config.port config
+settings :: Context.Context -> Warp.Settings
+settings context =
+  let host = Context.host context
+      port = Context.port context
    in Warp.defaultSettings
         & Warp.setBeforeMainLoop
           ( logLn $
