@@ -3,16 +3,16 @@ module Daylatro.Type.Seed where
 import qualified Data.Text as Text
 import qualified Data.Time as Time
 import qualified Formatting as F
-import qualified Lucid as Html
+import qualified Lucid as H
 import qualified System.Random as Random
 
 newtype Seed
   = MkSeed Text.Text
   deriving (Eq, Show)
 
-instance Html.ToHtml Seed where
-  toHtml = Html.toHtml . toText
-  toHtmlRaw = Html.toHtmlRaw . toText
+instance H.ToHtml Seed where
+  toHtml = H.toHtml . toText
+  toHtmlRaw = H.toHtmlRaw . toText
 
 toText :: Seed -> Text.Text
 toText (MkSeed x) = x

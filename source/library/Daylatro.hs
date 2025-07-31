@@ -32,7 +32,7 @@ import qualified Daylatro.Type.Seed as Seed
 import Formatting ((%))
 import qualified Formatting as F
 import qualified Formatting.Time as F
-import qualified Lucid as Html
+import qualified Lucid as H
 import qualified Network.HTTP.Types as Http
 import qualified Network.URI as Uri
 import qualified Network.Wai as Wai
@@ -43,7 +43,7 @@ import qualified System.Environment as Environment
 import qualified System.Exit as Exit
 import qualified System.IO as IO
 import qualified Text.Read as Read
-import qualified Text.XML as Xml
+import qualified Text.XML as X
 
 main :: IO ()
 main = do
@@ -129,112 +129,112 @@ getIndex connection request respond = do
       """
       [day]
   let seed = Seed.fromDay day
-      header :: Html.Html ()
+      header :: H.Html ()
       header = do
-        Html.meta_
-          [ Html.term "property" "og:type",
-            Html.content_ "website"
+        H.meta_
+          [ H.term "property" "og:type",
+            H.content_ "website"
           ]
-        Html.meta_
-          [ Html.term "property" "og:title",
-            Html.content_ "Daylatro"
+        H.meta_
+          [ H.term "property" "og:title",
+            H.content_ "Daylatro"
           ]
-        Html.meta_
-          [ Html.term "property" "og:description",
-            Html.content_ $ F.sformat ("The Balatro daily seed for " % F.dateDash % " is " % Seed.format % ".") day seed
+        H.meta_
+          [ H.term "property" "og:description",
+            H.content_ $ F.sformat ("The Balatro daily seed for " % F.dateDash % " is " % Seed.format % ".") day seed
           ]
-        Html.script_ Script.shaderWebBackground
-        Html.script_
-          [Html.id_ "balatroShader", Html.type_ "x-shader/x-fragment"]
+        H.script_ Script.shaderWebBackground
+        H.script_
+          [H.id_ "balatroShader", H.type_ "x-shader/x-fragment"]
           Shader.balatro
-        Html.script_ Script.daylatro
-        Html.style_ Style.daylatro
-      content :: Html.Html ()
+        H.script_ Script.daylatro
+        H.style_ Style.daylatro
+      content :: H.Html ()
       content = do
-        Html.p_ $ do
+        H.p_ $ do
           "The "
-          Html.a_ [Html.href_ "https://www.playbalatro.com"] "Balatro"
+          H.a_ [H.href_ "https://www.playbalatro.com"] "Balatro"
           " daily seed for "
-          Html.br_ []
+          H.br_ []
           case maybePrevious of
             Nothing -> "<-"
             Just previous ->
-              Html.a_
-                [ Html.href_ $ F.sformat ("/?day=" % F.dateDash) previous,
-                  Html.title_ "Go to previous day."
+              H.a_
+                [ H.href_ $ F.sformat ("/?day=" % F.dateDash) previous,
+                  H.title_ "Go to previous day."
                 ]
                 "<-"
           " "
-          Html.toHtml $ formatDay day
+          H.toHtml $ formatDay day
           " "
           case maybeNext of
             Nothing -> "->"
             Just next ->
-              Html.a_
-                [ Html.href_ $ F.sformat ("/?day=" % F.dateDash) next,
-                  Html.title_ "Go to next day."
+              H.a_
+                [ H.href_ $ F.sformat ("/?day=" % F.dateDash) next,
+                  H.title_ "Go to next day."
                 ]
                 "->"
-          Html.br_ []
+          H.br_ []
           " is "
-          Html.span_
-            [ Html.onclick_ $ F.sformat ("navigator.clipboard.writeText('" % Seed.format % "');") seed,
-              Html.title_ "Click to copy."
+          H.span_
+            [ H.onclick_ $ F.sformat ("navigator.clipboard.writeText('" % Seed.format % "');") seed,
+              H.title_ "Click to copy."
             ]
-            $ Html.toHtml seed
+            $ H.toHtml seed
           "."
-        Html.form_ [Html.method_ "post"] $ do
-          Html.input_
-            [ Html.name_ "day",
-              Html.type_ "hidden",
-              Html.value_ $ formatDay day
+        H.form_ [H.method_ "post"] $ do
+          H.input_
+            [ H.name_ "day",
+              H.type_ "hidden",
+              H.value_ $ formatDay day
             ]
-          Html.table_ $ do
-            Html.thead_ . Html.tr_ $ do
-              Html.th_ "Name"
-              Html.th_ "Ante"
-              Html.th_ "Best Hand"
-            Html.tbody_ $ do
-              Monad.forM_ scores $ \score -> Html.tr_ $ do
-                Html.td_ . Html.toHtml . Score.name $ Model.value score
-                Html.td_ . Html.toHtml . show . Score.ante $ Model.value score
-                Html.td_
-                  . Html.toHtml
+          H.table_ $ do
+            H.thead_ . H.tr_ $ do
+              H.th_ "Name"
+              H.th_ "Ante"
+              H.th_ "Best Hand"
+            H.tbody_ $ do
+              Monad.forM_ scores $ \score -> H.tr_ $ do
+                H.td_ . H.toHtml . Score.name $ Model.value score
+                H.td_ . H.toHtml . show . Score.ante $ Model.value score
+                H.td_
+                  . H.toHtml
                   . (\x -> Maybe.fromMaybe x $ Text.stripSuffix ".0" x)
                   . Text.pack
                   . maybe "" show
                   . Score.bestHand
                   $ Model.value score
-              Html.tr_ $ do
-                Html.td_ $
-                  Html.input_
-                    [ Html.maxlength_ "3",
-                      Html.minlength_ "1",
-                      Html.name_ "name",
-                      Html.pattern_ "[A-Za-z0-9]+",
-                      Html.placeholder_ "ABC",
-                      Html.required_ "required",
-                      Html.size_ "4"
+              H.tr_ $ do
+                H.td_ $
+                  H.input_
+                    [ H.maxlength_ "3",
+                      H.minlength_ "1",
+                      H.name_ "name",
+                      H.pattern_ "[A-Za-z0-9]+",
+                      H.placeholder_ "ABC",
+                      H.required_ "required",
+                      H.size_ "4"
                     ]
-                Html.td_ $
-                  Html.input_
-                    [ Html.max_ "39",
-                      Html.min_ "0",
-                      Html.name_ "ante",
-                      Html.placeholder_ "8",
-                      Html.required_ "required",
-                      Html.size_ "3",
-                      Html.type_ "number"
+                H.td_ $
+                  H.input_
+                    [ H.max_ "39",
+                      H.min_ "0",
+                      H.name_ "ante",
+                      H.placeholder_ "8",
+                      H.required_ "required",
+                      H.size_ "3",
+                      H.type_ "number"
                     ]
-                Html.td_ $
-                  Html.input_
-                    [ Html.min_ "0",
-                      Html.name_ "bestHand",
-                      Html.placeholder_ "123456",
-                      Html.size_ "10",
-                      Html.type_ "number"
+                H.td_ $
+                  H.input_
+                    [ H.min_ "0",
+                      H.name_ "bestHand",
+                      H.placeholder_ "123456",
+                      H.size_ "10",
+                      H.type_ "number"
                     ]
-          Html.button_ [Html.type_ "submit"] "Submit"
+          H.button_ [H.type_ "submit"] "Submit"
   respond
     . htmlResponse Http.ok200 []
     $ template header content
@@ -301,58 +301,58 @@ getFeed config respond = do
   today <- fmap Time.utctDay Time.getCurrentTime
   respond
     . Wai.responseLBS Http.ok200 [(Http.hContentType, "application/atom+xml;charset=utf-8")]
-    $ Xml.renderLBS
+    $ X.renderLBS
       Default.def
-      Xml.Document
-        { Xml.documentPrologue =
-            Xml.Prologue
-              { Xml.prologueBefore = [],
-                Xml.prologueDoctype = Nothing,
-                Xml.prologueAfter = []
+      X.Document
+        { X.documentPrologue =
+            X.Prologue
+              { X.prologueBefore = [],
+                X.prologueDoctype = Nothing,
+                X.prologueAfter = []
               },
-          Xml.documentRoot =
-            Xml.Element
-              { Xml.elementName = "feed",
-                Xml.elementAttributes = Map.singleton "xmlns" "http://www.w3.org/2005/Atom",
-                Xml.elementNodes =
-                  Xml.NodeElement
-                    Xml.Element
-                      { Xml.elementName = "id",
-                        Xml.elementAttributes = Map.empty,
-                        Xml.elementNodes = [Xml.NodeContent $ F.sformat (F.stext % "/feed.atom") (Config.baseUrl config)]
+          X.documentRoot =
+            X.Element
+              { X.elementName = "feed",
+                X.elementAttributes = Map.singleton "xmlns" "http://www.w3.org/2005/Atom",
+                X.elementNodes =
+                  X.NodeElement
+                    X.Element
+                      { X.elementName = "id",
+                        X.elementAttributes = Map.empty,
+                        X.elementNodes = [X.NodeContent $ F.sformat (F.stext % "/feed.atom") (Config.baseUrl config)]
                       }
-                    : Xml.NodeElement
-                      Xml.Element
-                        { Xml.elementName = "link",
-                          Xml.elementAttributes =
+                    : X.NodeElement
+                      X.Element
+                        { X.elementName = "link",
+                          X.elementAttributes =
                             Map.fromList
                               [ ("rel", "self"),
                                 ("href", F.sformat (F.stext % "/feed.atom") (Config.baseUrl config))
                               ],
-                          Xml.elementNodes = []
+                          X.elementNodes = []
                         }
-                    : Xml.NodeElement
-                      Xml.Element
-                        { Xml.elementName = "title",
-                          Xml.elementAttributes = Map.empty,
-                          Xml.elementNodes = [Xml.NodeContent "Daylatro"]
+                    : X.NodeElement
+                      X.Element
+                        { X.elementName = "title",
+                          X.elementAttributes = Map.empty,
+                          X.elementNodes = [X.NodeContent "Daylatro"]
                         }
-                    : Xml.NodeElement
-                      Xml.Element
-                        { Xml.elementName = "updated",
-                          Xml.elementAttributes = Map.empty,
-                          Xml.elementNodes = [Xml.NodeContent . Text.pack $ Time.formatTime Time.defaultTimeLocale "%Y-%m-%dT00:00:00Z" today]
+                    : X.NodeElement
+                      X.Element
+                        { X.elementName = "updated",
+                          X.elementAttributes = Map.empty,
+                          X.elementNodes = [X.NodeContent . Text.pack $ Time.formatTime Time.defaultTimeLocale "%Y-%m-%dT00:00:00Z" today]
                         }
-                    : Xml.NodeElement
-                      Xml.Element
-                        { Xml.elementName = "author",
-                          Xml.elementAttributes = Map.empty,
-                          Xml.elementNodes =
-                            [ Xml.NodeElement
-                                Xml.Element
-                                  { Xml.elementName = "name",
-                                    Xml.elementAttributes = Map.empty,
-                                    Xml.elementNodes = [Xml.NodeContent "Taylor Fausak"]
+                    : X.NodeElement
+                      X.Element
+                        { X.elementName = "author",
+                          X.elementAttributes = Map.empty,
+                          X.elementNodes =
+                            [ X.NodeElement
+                                X.Element
+                                  { X.elementName = "name",
+                                    X.elementAttributes = Map.empty,
+                                    X.elementNodes = [X.NodeContent "Taylor Fausak"]
                                   }
                             ]
                         }
@@ -360,51 +360,51 @@ getFeed config respond = do
                       ( \day ->
                           let seed = Seed.fromDay day
                               url = F.sformat (F.stext % "/?day=" % F.dateDash) (Config.baseUrl config) day
-                           in Xml.NodeElement
-                                Xml.Element
-                                  { Xml.elementName = "entry",
-                                    Xml.elementAttributes = Map.empty,
-                                    Xml.elementNodes =
-                                      [ Xml.NodeElement
-                                          Xml.Element
-                                            { Xml.elementName = "id",
-                                              Xml.elementAttributes = Map.empty,
-                                              Xml.elementNodes = [Xml.NodeContent url]
+                           in X.NodeElement
+                                X.Element
+                                  { X.elementName = "entry",
+                                    X.elementAttributes = Map.empty,
+                                    X.elementNodes =
+                                      [ X.NodeElement
+                                          X.Element
+                                            { X.elementName = "id",
+                                              X.elementAttributes = Map.empty,
+                                              X.elementNodes = [X.NodeContent url]
                                             },
-                                        Xml.NodeElement
-                                          Xml.Element
-                                            { Xml.elementName = "link",
-                                              Xml.elementAttributes =
+                                        X.NodeElement
+                                          X.Element
+                                            { X.elementName = "link",
+                                              X.elementAttributes =
                                                 Map.fromList
                                                   [ ("rel", "self"),
                                                     ("href", url)
                                                   ],
-                                              Xml.elementNodes = []
+                                              X.elementNodes = []
                                             },
-                                        Xml.NodeElement
-                                          Xml.Element
-                                            { Xml.elementName = "title",
-                                              Xml.elementAttributes = Map.empty,
-                                              Xml.elementNodes = [Xml.NodeContent $ F.sformat ("Daily seed for " % F.dateDash) day]
+                                        X.NodeElement
+                                          X.Element
+                                            { X.elementName = "title",
+                                              X.elementAttributes = Map.empty,
+                                              X.elementNodes = [X.NodeContent $ F.sformat ("Daily seed for " % F.dateDash) day]
                                             },
-                                        Xml.NodeElement
-                                          Xml.Element
-                                            { Xml.elementName = "updated",
-                                              Xml.elementAttributes = Map.empty,
-                                              Xml.elementNodes = [Xml.NodeContent $ F.sformat (F.dateDash % "T00:00:00Z") day]
+                                        X.NodeElement
+                                          X.Element
+                                            { X.elementName = "updated",
+                                              X.elementAttributes = Map.empty,
+                                              X.elementNodes = [X.NodeContent $ F.sformat (F.dateDash % "T00:00:00Z") day]
                                             },
-                                        Xml.NodeElement
-                                          Xml.Element
-                                            { Xml.elementName = "content",
-                                              Xml.elementAttributes = Map.empty,
-                                              Xml.elementNodes = [Xml.NodeContent $ Seed.toText seed]
+                                        X.NodeElement
+                                          X.Element
+                                            { X.elementName = "content",
+                                              X.elementAttributes = Map.empty,
+                                              X.elementNodes = [X.NodeContent $ Seed.toText seed]
                                             }
                                       ]
                                   }
                       )
                       [epoch .. today]
               },
-          Xml.documentEpilogue = []
+          X.documentEpilogue = []
         }
 
 between :: (Ord a) => a -> a -> a -> Bool
@@ -442,46 +442,46 @@ logLn message = do
   now <- Time.getCurrentTime
   F.fprintLn (F.customTimeFmt "%Y-%m-%dT%H:%M:%S%3QZ " % F.stext) now message
 
-htmlResponse :: Http.Status -> Http.ResponseHeaders -> Html.Html a -> Wai.Response
+htmlResponse :: Http.Status -> Http.ResponseHeaders -> H.Html a -> Wai.Response
 htmlResponse status headers =
   Wai.responseLBS status ((Http.hContentType, "text/html;charset=utf-8") : headers)
-    . Html.renderBS
+    . H.renderBS
 
 statusResponse :: Http.Status -> Http.ResponseHeaders -> Wai.Response
 statusResponse status headers =
   htmlResponse status headers . template mempty $ do
-    Html.h2_ $ do
+    H.h2_ $ do
       "HTTP "
-      Html.toHtml . show $ Http.statusCode status
-    Html.p_ . Html.toHtml $ Http.statusMessage status
+      H.toHtml . show $ Http.statusCode status
+    H.p_ . H.toHtml $ Http.statusMessage status
 
-template :: Html.Html () -> Html.Html () -> Html.Html ()
+template :: H.Html () -> H.Html () -> H.Html ()
 template header content = do
-  Html.doctype_
-  Html.html_ [Html.lang_ "en-US"] $ do
-    Html.head_ $ do
-      Html.meta_ [Html.charset_ "utf-8"]
-      Html.meta_ [Html.name_ "viewport", Html.content_ "initial-scale = 1, width = device-width"]
-      Html.link_
-        [ Html.href_ $ F.sformat ("data:image/svg+xml," % F.string) (Uri.escapeURIString Uri.isUnescapedInURIComponent Favicon.daylatro),
-          Html.rel_ "icon",
-          Html.type_ "image/svg+xml"
+  H.doctype_
+  H.html_ [H.lang_ "en-US"] $ do
+    H.head_ $ do
+      H.meta_ [H.charset_ "utf-8"]
+      H.meta_ [H.name_ "viewport", H.content_ "initial-scale = 1, width = device-width"]
+      H.link_
+        [ H.href_ $ F.sformat ("data:image/svg+xml," % F.string) (Uri.escapeURIString Uri.isUnescapedInURIComponent Favicon.daylatro),
+          H.rel_ "icon",
+          H.type_ "image/svg+xml"
         ]
-      Html.link_
-        [ Html.href_ "/feed.atom",
-          Html.rel_ "alternate",
-          Html.type_ "application/atom+xml"
+      H.link_
+        [ H.href_ "/feed.atom",
+          H.rel_ "alternate",
+          H.type_ "application/atom+xml"
         ]
-      Html.title_ "Daylatro"
+      H.title_ "Daylatro"
       header
-    Html.body_ $ do
-      Html.header_
-        . Html.h1_
-        $ Html.a_ [Html.href_ "/"] "Daylatro"
-      Html.main_ content
-      Html.footer_
-        . Html.p_
-        $ Html.a_ [Html.href_ "https://github.com/tfausak/daylatro"] "tfausak/daylatro"
+    H.body_ $ do
+      H.header_
+        . H.h1_
+        $ H.a_ [H.href_ "/"] "Daylatro"
+      H.main_ content
+      H.footer_
+        . H.p_
+        $ H.a_ [H.href_ "https://github.com/tfausak/daylatro"] "tfausak/daylatro"
 
 lookupDay :: Wai.Request -> Maybe Time.Day
 lookupDay request = do
