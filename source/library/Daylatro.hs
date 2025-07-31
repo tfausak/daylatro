@@ -1,4 +1,3 @@
-{-# LANGUAGE MultilineStrings #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Daylatro where
@@ -12,17 +11,22 @@ import qualified Data.Default as Default
 import Data.Function ((&))
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
-import qualified Data.String as String
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.Time as Time
 import qualified Data.Version as Version
 import qualified Database.SQLite.Simple as Sql
-import qualified Database.SQLite.Simple.FromField as Sql
-import qualified Database.SQLite.Simple.ToField as Sql
 import qualified Daylatro.Constant.Script as Script
 import qualified Daylatro.Constant.Shader as Shader
 import qualified Daylatro.Constant.Style as Style
+import qualified Daylatro.Exception.InvalidOption as InvalidOption
+import qualified Daylatro.Exception.UnexpectedArgument as UnexpectedArgument
+import qualified Daylatro.Exception.UnknownOption as UnknownOption
+import qualified Daylatro.Type.Config as Config
+import qualified Daylatro.Type.Flag as Flag
+import qualified Daylatro.Type.Model as Model
+import qualified Daylatro.Type.Score as Score
+import qualified Daylatro.Type.Seed as Seed
 import Formatting ((%))
 import qualified Formatting as F
 import qualified Formatting.Time as F
@@ -36,7 +40,6 @@ import qualified System.Console.GetOpt as GetOpt
 import qualified System.Environment as Environment
 import qualified System.Exit as Exit
 import qualified System.IO as IO
-import qualified System.Random as Random
 import qualified Text.Read as Read
 import qualified Text.XML as Xml
 
@@ -48,23 +51,23 @@ main = do
 mainWith :: [String] -> IO ()
 mainWith arguments = do
   flags <- do
-    let (flgs, args, opts, errs) = GetOpt.getOpt' GetOpt.Permute options arguments
-    Monad.forM_ errs $ Exception.throwM . MkInvalidOption
-    Monad.forM_ opts $ Exception.throwM . MkUnkownOption
-    Monad.forM_ args $ Exception.throwM . MkUnexpectedArgument
+    let (flgs, args, opts, errs) = GetOpt.getOpt' GetOpt.Permute Flag.options arguments
+    Monad.forM_ errs $ Exception.throwM . InvalidOption.MkInvalidOption
+    Monad.forM_ opts $ Exception.throwM . UnknownOption.MkUnknownOption
+    Monad.forM_ args $ Exception.throwM . UnexpectedArgument.MkUnexpectedArgument
     pure flgs
 
-  config <- Monad.foldM applyFlag initialConfig flags
-  Monad.when (configHelp config) $ do
+  config <- Monad.foldM Config.applyFlag Config.initial flags
+  Monad.when (Config.help config) $ do
     name <- Environment.getProgName
-    putStr $ GetOpt.usageInfo name options
+    putStr $ GetOpt.usageInfo name Flag.options
     Exit.exitSuccess
 
-  Monad.when (configVersion config) $ do
+  Monad.when (Config.version config) $ do
     putStrLn $ Version.showVersion Package.version
     Exit.exitSuccess
 
-  Sql.withConnection (configDatabase config) $ \connection -> do
+  Sql.withConnection (Config.database config) $ \connection -> do
     IO.hSetBuffering IO.stdout IO.LineBuffering
     Sql.execute_
       connection
@@ -77,76 +80,7 @@ mainWith arguments = do
       \ , bestHand real )"
     Warp.runSettings (settings config) $ application connection config
 
-newtype InvalidOption
-  = MkInvalidOption String
-  deriving (Eq, Show)
-
-instance Exception.Exception InvalidOption
-
-newtype UnkownOption
-  = MkUnkownOption String
-  deriving (Eq, Show)
-
-instance Exception.Exception UnkownOption
-
-newtype UnexpectedArgument
-  = MkUnexpectedArgument String
-  deriving (Eq, Show)
-
-instance Exception.Exception UnexpectedArgument
-
-options :: [GetOpt.OptDescr Flag]
-options =
-  [ GetOpt.Option ['h'] ["help"] (GetOpt.NoArg FlagHelp) "",
-    GetOpt.Option [] ["version"] (GetOpt.NoArg FlagVersion) "",
-    GetOpt.Option [] ["base-url"] (GetOpt.ReqArg FlagBaseUrl "URL") "",
-    GetOpt.Option [] ["database"] (GetOpt.ReqArg FlagDatabase "STRING") "",
-    GetOpt.Option [] ["host"] (GetOpt.ReqArg FlagHost "STRING") "",
-    GetOpt.Option [] ["port"] (GetOpt.ReqArg FlagPort "INT") ""
-  ]
-
-data Flag
-  = FlagBaseUrl String
-  | FlagDatabase String
-  | FlagHelp
-  | FlagHost String
-  | FlagPort String
-  | FlagVersion
-  deriving (Eq, Show)
-
-data Config = MkConfig
-  { configBaseUrl :: String,
-    configDatabase :: FilePath,
-    configHelp :: Bool,
-    configHost :: Warp.HostPreference,
-    configPort :: Warp.Port,
-    configVersion :: Bool
-  }
-  deriving (Eq, Show)
-
-initialConfig :: Config
-initialConfig =
-  MkConfig
-    { configBaseUrl = "",
-      configDatabase = ":memory:",
-      configHelp = False,
-      configHost = "127.0.0.1",
-      configPort = 8080,
-      configVersion = False
-    }
-
-applyFlag :: (Exception.MonadThrow m) => Config -> Flag -> m Config
-applyFlag config flag = case flag of
-  FlagBaseUrl string -> pure config {configBaseUrl = string}
-  FlagDatabase database -> pure config {configDatabase = database}
-  FlagHelp -> pure config {configHelp = True}
-  FlagHost string -> pure config {configHost = String.fromString string}
-  FlagPort string -> case Read.readMaybe string of
-    Nothing -> Exception.throwM . MkInvalidOption $ "invalid port: " <> show string
-    Just port -> pure config {configPort = port}
-  FlagVersion -> pure config {configVersion = True}
-
-application :: Sql.Connection -> Config -> Wai.Application
+application :: Sql.Connection -> Config.Config -> Wai.Application
 application connection config request respond = case Wai.pathInfo request of
   [] -> case Http.parseMethod $ Wai.requestMethod request of
     Right Http.GET -> getIndex connection request respond
@@ -187,7 +121,7 @@ getIndex connection request respond = do
       \ order by ante desc, bestHand desc \
       \ limit 10"
       [day]
-  let seed = getSeed day
+  let seed = Seed.fromDay day
       header :: Html.Html ()
       header = do
         Html.meta_
@@ -200,7 +134,7 @@ getIndex connection request respond = do
           ]
         Html.meta_
           [ Html.term "property" "og:description",
-            Html.content_ $ F.sformat ("The Balatro daily seed for " % F.dateDash % " is " % formatSeed % ".") day seed
+            Html.content_ $ F.sformat ("The Balatro daily seed for " % F.dateDash % " is " % Seed.format % ".") day seed
           ]
         Html.script_ Script.shaderWebBackground
         Html.script_
@@ -237,7 +171,7 @@ getIndex connection request respond = do
           Html.br_ []
           " is "
           Html.span_
-            [ Html.onclick_ $ "navigator.clipboard.writeText('" <> seedToText seed <> "');",
+            [ Html.onclick_ $ "navigator.clipboard.writeText('" <> Seed.toText seed <> "');",
               Html.title_ "Click to copy."
             ]
             $ Html.toHtml seed
@@ -255,15 +189,15 @@ getIndex connection request respond = do
               Html.th_ "Best Hand"
             Html.tbody_ $ do
               Monad.forM_ scores $ \score -> Html.tr_ $ do
-                Html.td_ . Html.toHtml . scoreName $ modelValue score
-                Html.td_ . Html.toHtml . show . scoreAnte $ modelValue score
+                Html.td_ . Html.toHtml . Score.name $ Model.value score
+                Html.td_ . Html.toHtml . show . Score.ante $ Model.value score
                 Html.td_
                   . Html.toHtml
                   . (\x -> Maybe.fromMaybe x $ Text.stripSuffix ".0" x)
                   . Text.pack
                   . maybe "" show
-                  . scoreBestHand
-                  $ modelValue score
+                  . Score.bestHand
+                  $ Model.value score
               Html.tr_ $ do
                 Html.td_ $
                   Html.input_
@@ -332,12 +266,12 @@ postIndex connection request respond = do
         Monad.guard $ maybe True (>= 0) bestHand
         Monad.guard $ maybe True (not . isInfinite) bestHand
         pure
-          MkScore
-            { scoreCreatedAt = now,
-              scoreDay = day,
-              scoreName = name,
-              scoreAnte = ante,
-              scoreBestHand = bestHand
+          Score.MkScore
+            { Score.createdAt = now,
+              Score.day = day,
+              Score.name = name,
+              Score.ante = ante,
+              Score.bestHand = bestHand
             }
   case maybeScore of
     Nothing -> respond $ statusResponse Http.badRequest400 []
@@ -350,10 +284,10 @@ postIndex connection request respond = do
       respond $
         statusResponse
           Http.found302
-          [(Http.hLocation, mappend "/?day=" . Encoding.encodeUtf8 . Text.pack . formatDay $ scoreDay score)]
+          [(Http.hLocation, mappend "/?day=" . Encoding.encodeUtf8 . Text.pack . formatDay $ Score.day score)]
 
 getFeed ::
-  Config ->
+  Config.Config ->
   (Wai.Response -> IO Wai.ResponseReceived) ->
   IO Wai.ResponseReceived
 getFeed config respond = do
@@ -378,7 +312,7 @@ getFeed config respond = do
                     Xml.Element
                       { Xml.elementName = "id",
                         Xml.elementAttributes = Map.empty,
-                        Xml.elementNodes = [Xml.NodeContent . Text.pack $ configBaseUrl config <> "/feed.atom"]
+                        Xml.elementNodes = [Xml.NodeContent . Text.pack $ Config.baseUrl config <> "/feed.atom"]
                       }
                     : Xml.NodeElement
                       Xml.Element
@@ -386,7 +320,7 @@ getFeed config respond = do
                           Xml.elementAttributes =
                             Map.fromList
                               [ ("rel", "self"),
-                                ("href", Text.pack $ configBaseUrl config <> "/feed.atom")
+                                ("href", Text.pack $ Config.baseUrl config <> "/feed.atom")
                               ],
                           Xml.elementNodes = []
                         }
@@ -417,9 +351,9 @@ getFeed config respond = do
                         }
                     : fmap
                       ( \day ->
-                          let seed = getSeed day
+                          let seed = Seed.fromDay day
                               date = Text.pack $ Time.formatTime Time.defaultTimeLocale "%Y-%m-%d" day
-                              url = Text.pack (configBaseUrl config) <> "/?day=" <> date
+                              url = Text.pack (Config.baseUrl config) <> "/?day=" <> date
                            in Xml.NodeElement
                                 Xml.Element
                                   { Xml.elementName = "entry",
@@ -457,7 +391,7 @@ getFeed config respond = do
                                           Xml.Element
                                             { Xml.elementName = "content",
                                               Xml.elementAttributes = Map.empty,
-                                              Xml.elementNodes = [Xml.NodeContent $ seedToText seed]
+                                              Xml.elementNodes = [Xml.NodeContent $ Seed.toText seed]
                                             }
                                       ]
                                   }
@@ -470,10 +404,10 @@ getFeed config respond = do
 between :: (Ord a) => a -> a -> a -> Bool
 between lo hi x = lo <= x && x <= hi
 
-settings :: Config -> Warp.Settings
+settings :: Config.Config -> Warp.Settings
 settings config =
-  let host = configHost config
-      port = configPort config
+  let host = Config.host config
+      port = Config.port config
    in Warp.defaultSettings
         & Warp.setBeforeMainLoop
           ( logLn $
@@ -556,93 +490,5 @@ parseDay = Time.parseTimeM False Time.defaultTimeLocale "%Y-%m-%d"
 formatDay :: Time.Day -> String
 formatDay = Time.formatTime Time.defaultTimeLocale "%Y-%m-%d"
 
-newtype Seed
-  = MkSeed String
-  deriving (Eq, Show)
-
-instance Html.ToHtml Seed where
-  toHtml = Html.toHtml . seedToString
-  toHtmlRaw = Html.toHtmlRaw . seedToString
-
-seedToString :: Seed -> String
-seedToString (MkSeed x) = x
-
-seedToText :: Seed -> Text.Text
-seedToText = Text.pack . seedToString
-
-formatSeed :: F.Format t (Seed -> t)
-formatSeed = F.mapf seedToString F.string
-
-getSeed :: Time.Day -> Seed
-getSeed =
-  MkSeed
-    . fmap (toEnum . (\x -> x + if x < 10 then 48 else 55))
-    . fst
-    . Random.uniformListR 8 (0, 35)
-    . Random.mkStdGen
-    . fromIntegral
-    . Time.toModifiedJulianDay
-
 epoch :: Time.Day
 epoch = Time.fromGregorian 2024 2 20
-
-data Model a = MkModel
-  { modelKey :: Key a,
-    modelValue :: a
-  }
-  deriving (Eq, Show)
-
-instance (Sql.FromRow a) => Sql.FromRow (Model a) where
-  fromRow = do
-    key <- Sql.field
-    value <- Sql.fromRow
-    pure MkModel {modelKey = key, modelValue = value}
-
-instance (Sql.ToRow a) => Sql.ToRow (Model a) where
-  toRow model = Sql.toRow $ Sql.Only (modelKey model) Sql.:. modelValue model
-
-newtype Key a = MkKey
-  { keyValue :: Int
-  }
-  deriving (Eq, Show)
-
-instance Sql.FromField (Key a) where
-  fromField = fmap MkKey . Sql.fromField
-
-instance Sql.ToField (Key a) where
-  toField = Sql.toField . keyValue
-
-data Score = MkScore
-  { scoreCreatedAt :: Time.UTCTime,
-    scoreDay :: Time.Day,
-    scoreName :: Text.Text,
-    scoreAnte :: Int,
-    scoreBestHand :: Maybe Double
-  }
-  deriving (Eq, Show)
-
-instance Sql.FromRow Score where
-  fromRow = do
-    createdAt <- Sql.field
-    day <- Sql.field
-    name <- Sql.field
-    ante <- Sql.field
-    bestHand <- Sql.field
-    pure
-      MkScore
-        { scoreCreatedAt = createdAt,
-          scoreDay = day,
-          scoreName = name,
-          scoreAnte = ante,
-          scoreBestHand = bestHand
-        }
-
-instance Sql.ToRow Score where
-  toRow score =
-    Sql.toRow
-      ( scoreCreatedAt score,
-        scoreDay score,
-        scoreName score,
-        scoreAnte score,
-        scoreBestHand score
-      )

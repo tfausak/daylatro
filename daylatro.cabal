@@ -72,6 +72,15 @@ library
     Daylatro.Constant.Script
     Daylatro.Constant.Shader
     Daylatro.Constant.Style
+    Daylatro.Exception.InvalidOption
+    Daylatro.Exception.UnexpectedArgument
+    Daylatro.Exception.UnknownOption
+    Daylatro.Type.Config
+    Daylatro.Type.Flag
+    Daylatro.Type.Key
+    Daylatro.Type.Model
+    Daylatro.Type.Score
+    Daylatro.Type.Seed
 
   hs-source-dirs: source/library
   other-modules: PackageInfo_daylatro
