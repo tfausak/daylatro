@@ -11,14 +11,10 @@ import qualified Formatting as F
 daylatro :: Text.Text
 daylatro =
   F.sformat
-    ( """
-      @font-face {
-        font-family: 'Balatro';
-        src: url(data:text/woff;base64,
-      """
+    ( "@font-face { font-family: 'Balatro'; src: url(data:text/woff;base64,"
         % F.stext
+        % "); }"
         % """
-          ); }
           html {
             background: black;
             color: white;
