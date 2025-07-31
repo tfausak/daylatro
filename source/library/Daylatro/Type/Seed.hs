@@ -7,25 +7,23 @@ import qualified Lucid as Html
 import qualified System.Random as Random
 
 newtype Seed
-  = MkSeed String
+  = MkSeed Text.Text
   deriving (Eq, Show)
 
 instance Html.ToHtml Seed where
-  toHtml = Html.toHtml . toString
-  toHtmlRaw = Html.toHtmlRaw . toString
-
-toString :: Seed -> String
-toString (MkSeed x) = x
+  toHtml = Html.toHtml . toText
+  toHtmlRaw = Html.toHtmlRaw . toText
 
 toText :: Seed -> Text.Text
-toText = Text.pack . toString
+toText (MkSeed x) = x
 
 format :: F.Format t (Seed -> t)
-format = F.mapf toString F.string
+format = F.mapf toText F.stext
 
 fromDay :: Time.Day -> Seed
 fromDay =
   MkSeed
+    . Text.pack
     . fmap (toEnum . (\x -> x + if x < 10 then 48 else 55))
     . fst
     . Random.uniformListR 8 (0, 35)

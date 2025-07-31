@@ -5,6 +5,7 @@ module Daylatro.Type.Config where
 
 import qualified Control.Monad.Catch as Exception
 import qualified Data.String as String
+import qualified Data.Text as Text
 import qualified Daylatro.Exception.InvalidOption as InvalidOption
 import qualified Daylatro.Type.Flag as Flag
 import Formatting ((%))
@@ -13,7 +14,7 @@ import qualified Network.Wai.Handler.Warp as Warp
 import qualified Text.Read as Read
 
 data Config = MkConfig
-  { baseUrl :: String,
+  { baseUrl :: Text.Text,
     database :: FilePath,
     help :: Bool,
     host :: Warp.HostPreference,
@@ -35,7 +36,7 @@ initial =
 
 applyFlag :: (Exception.MonadThrow m) => Config -> Flag.Flag -> m Config
 applyFlag config flag = case flag of
-  Flag.BaseUrl baseUrl -> pure config {baseUrl}
+  Flag.BaseUrl string -> pure config {baseUrl = Text.pack string}
   Flag.Database database -> pure config {database}
   Flag.Help -> pure config {help = True}
   Flag.Host string -> pure config {host = String.fromString string}
@@ -43,6 +44,6 @@ applyFlag config flag = case flag of
     Nothing ->
       Exception.throwM
         . InvalidOption.MkInvalidOption
-        $ F.formatToString ("invalid port: " % F.shown) string
+        $ F.sformat ("invalid port: " % F.shown) string
     Just port -> pure config {port}
   Flag.Version -> pure config {version = True}

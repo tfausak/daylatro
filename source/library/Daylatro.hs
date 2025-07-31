@@ -52,12 +52,10 @@ main = do
 
 mainWith :: [String] -> IO ()
 mainWith arguments = do
-  flags <- do
-    let (flgs, args, opts, errs) = GetOpt.getOpt' GetOpt.Permute Flag.options arguments
-    Monad.forM_ errs $ Exception.throwM . InvalidOption.MkInvalidOption
-    Monad.forM_ opts $ Exception.throwM . UnknownOption.MkUnknownOption
-    Monad.forM_ args $ Exception.throwM . UnexpectedArgument.MkUnexpectedArgument
-    pure flgs
+  let (flags, args, opts, errs) = GetOpt.getOpt' GetOpt.Permute Flag.options arguments
+  Monad.forM_ errs $ Exception.throwM . InvalidOption.MkInvalidOption . Text.pack
+  Monad.forM_ opts $ Exception.throwM . UnknownOption.MkUnknownOption . Text.pack
+  Monad.forM_ args $ Exception.throwM . UnexpectedArgument.MkUnexpectedArgument . Text.pack
 
   config <- Monad.foldM Config.applyFlag Config.initial flags
   Monad.when (Config.help config) $ do
@@ -71,18 +69,21 @@ mainWith arguments = do
 
   Sql.withConnection (Config.database config) $ \connection -> do
     IO.hSetBuffering IO.stdout IO.LineBuffering
-    Sql.execute_
-      connection
-      """
-      create table if not exists Score
-        ( key integer primary key
-        , createdAt text not null
-        , day text not null
-        , name text not null
-        , ante integer not null
-        , bestHand real )
-      """
+    mapM_ (Sql.execute_ connection) migrations
     Warp.runSettings (settings config) $ application connection config
+
+migrations :: [Sql.Query]
+migrations =
+  [ """
+    create table if not exists Score
+      ( key integer primary key
+      , createdAt text not null
+      , day text not null
+      , name text not null
+      , ante integer not null
+      , bestHand real )
+    """
+  ]
 
 application :: Sql.Connection -> Config.Config -> Wai.Application
 application connection config request respond = case Wai.pathInfo request of
@@ -186,7 +187,7 @@ getIndex connection request respond = do
           Html.input_
             [ Html.name_ "day",
               Html.type_ "hidden",
-              Html.value_ . Text.pack $ formatDay day
+              Html.value_ $ formatDay day
             ]
           Html.table_ $ do
             Html.thead_ . Html.tr_ $ do
@@ -249,7 +250,7 @@ postIndex connection request respond = do
   let maybeScore = do
         day <-
           parseDay
-            . maybe "" Text.unpack
+            . Maybe.fromMaybe ""
             . Monad.join
             $ lookup "day" query
         name <- fmap (Text.map Char.toUpper) . Monad.join $ lookup "name" query
@@ -290,7 +291,7 @@ postIndex connection request respond = do
       respond $
         statusResponse
           Http.found302
-          [(Http.hLocation, mappend "/?day=" . Encoding.encodeUtf8 . Text.pack . formatDay $ Score.day score)]
+          [(Http.hLocation, F.formatted Encoding.encodeUtf8 ("/?day=" % F.dateDash) (Score.day score))]
 
 getFeed ::
   Config.Config ->
@@ -318,7 +319,7 @@ getFeed config respond = do
                     Xml.Element
                       { Xml.elementName = "id",
                         Xml.elementAttributes = Map.empty,
-                        Xml.elementNodes = [Xml.NodeContent $ F.sformat (F.string % "/feed.atom") (Config.baseUrl config)]
+                        Xml.elementNodes = [Xml.NodeContent $ F.sformat (F.stext % "/feed.atom") (Config.baseUrl config)]
                       }
                     : Xml.NodeElement
                       Xml.Element
@@ -326,7 +327,7 @@ getFeed config respond = do
                           Xml.elementAttributes =
                             Map.fromList
                               [ ("rel", "self"),
-                                ("href", F.sformat (F.string % "/feed.atom") (Config.baseUrl config))
+                                ("href", F.sformat (F.stext % "/feed.atom") (Config.baseUrl config))
                               ],
                           Xml.elementNodes = []
                         }
@@ -358,7 +359,7 @@ getFeed config respond = do
                     : fmap
                       ( \day ->
                           let seed = Seed.fromDay day
-                              url = F.sformat (F.string % "/?day=" % F.dateDash) (Config.baseUrl config) day
+                              url = F.sformat (F.stext % "/?day=" % F.dateDash) (Config.baseUrl config) day
                            in Xml.NodeElement
                                 Xml.Element
                                   { Xml.elementName = "entry",
@@ -416,7 +417,7 @@ settings config =
    in Warp.defaultSettings
         & Warp.setBeforeMainLoop
           ( logLn $
-              F.formatToString
+              F.sformat
                 ("Listening on " % F.shown % " port " % F.int)
                 host
                 port
@@ -425,7 +426,7 @@ settings config =
         & Warp.setLogger
           ( \request status _ ->
               logLn $
-                F.formatToString
+                F.sformat
                   (F.stext % " " % F.stext % " " % F.int)
                   (Encoding.decodeUtf8Lenient $ Wai.requestMethod request)
                   (Encoding.decodeUtf8Lenient $ Wai.rawPathInfo request)
@@ -436,10 +437,10 @@ settings config =
         & Warp.setPort port
         & Warp.setServerName ByteString.empty
 
-logLn :: String -> IO ()
+logLn :: Text.Text -> IO ()
 logLn message = do
   now <- Time.getCurrentTime
-  F.fprintLn (F.customTimeFmt "%Y-%m-%dT%H:%M:%S%3QZ" % " " % F.string) now message
+  F.fprintLn (F.customTimeFmt "%Y-%m-%dT%H:%M:%S%3QZ " % F.stext) now message
 
 htmlResponse :: Http.Status -> Http.ResponseHeaders -> Html.Html a -> Wai.Response
 htmlResponse status headers =
@@ -487,13 +488,13 @@ lookupDay request = do
   maybeByteString <- lookup "day" $ Wai.queryString request
   byteString <- maybeByteString
   text <- either (const Nothing) Just $ Encoding.decodeUtf8' byteString
-  parseDay $ Text.unpack text
+  parseDay text
 
-parseDay :: String -> Maybe Time.Day
-parseDay = Time.parseTimeM False Time.defaultTimeLocale "%Y-%m-%d"
+parseDay :: Text.Text -> Maybe Time.Day
+parseDay = Time.parseTimeM False Time.defaultTimeLocale "%Y-%m-%d" . Text.unpack
 
-formatDay :: Time.Day -> String
-formatDay = Time.formatTime Time.defaultTimeLocale "%Y-%m-%d"
+formatDay :: Time.Day -> Text.Text
+formatDay = Text.pack . Time.formatTime Time.defaultTimeLocale "%Y-%m-%d"
 
 epoch :: Time.Day
 epoch = Time.fromGregorian 2024 2 20
