@@ -1,6 +1,5 @@
 allow-newer:
   , data-default:containers
   , hashable:containers
-  , lucid2:base
 
 packages: .

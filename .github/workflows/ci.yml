@@ -15,7 +15,7 @@ jobs:
       - run: mkdir artifact
       - uses: haskell/ghcup-setup@v1
         with:
-          ghc: 9.12.1
+          ghc: 9.12
           cabal: latest
       - run: ghc-pkg list
       - run: cabal update

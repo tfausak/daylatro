@@ -1,6 +1,6 @@
 cabal-version: 3.12
 name: daylatro
-version: 0.2025.6.2
+version: 0.2025.8.2
 synopsis: Generate daily Balatro seeds.
 description:
   Daylatro is a tool for generating daily Balatro seeds and comparing runs
@@ -18,30 +18,10 @@ flag pedantic
   default: False
   manual: True
 
-executable daylatro
-  autogen-modules: PackageInfo_daylatro
-  build-depends:
-    base ^>=4.21.0.0,
-    bytestring ^>=0.12.2.0,
-    containers ^>=0.8,
-    data-default ^>=0.8.0.0,
-    exceptions ^>=0.10.9,
-    formatting ^>=7.2.0,
-    http-types ^>=0.12.4,
-    lucid2 ^>=0.0.20240424,
-    network-uri ^>=2.6.4.2,
-    random ^>=1.3.0,
-    sqlite-simple ^>=0.4.19.0,
-    text ^>=2.1.2,
-    time ^>=1.14,
-    wai ^>=3.2.4,
-    warp ^>=3.4.7,
-    xml-conduit ^>=1.10.0.0,
-
+common library
+  build-depends: base ^>=4.21.0.0
   default-language: Haskell2010
   ghc-options:
-    -rtsopts
-    -threaded
     -Weverything
     -Wno-all-missed-specialisations
     -Wno-implicit-prelude
@@ -55,8 +35,71 @@ executable daylatro
     -Wno-safe
     -Wno-unsafe
 
-  main-is: Main.hs
-  other-modules: PackageInfo_daylatro
-
   if flag(pedantic)
     ghc-options: -Werror
+
+common executable
+  import: library
+  build-depends: daylatro
+  ghc-options:
+    -rtsopts
+    -threaded
+
+library
+  import: library
+  autogen-modules: PackageInfo_daylatro
+  build-depends:
+    bytestring ^>=0.12.2.0,
+    containers ^>=0.8,
+    data-default ^>=0.8.0.1,
+    exceptions ^>=0.10.9,
+    formatting ^>=7.2.0,
+    http-types ^>=0.12.4,
+    lucid2 ^>=0.0.20250303,
+    network-uri ^>=2.6.4.2,
+    random ^>=1.3.1,
+    sqlite-simple ^>=0.4.19.0,
+    text ^>=2.1.3,
+    time ^>=1.14,
+    wai ^>=3.2.4,
+    warp ^>=3.4.8,
+    xml-conduit ^>=1.10.0.1,
+
+  -- cabal-gild: discover source/library
+  exposed-modules:
+    Daylatro
+    Daylatro.Application
+    Daylatro.Constant.Balatro
+    Daylatro.Constant.Favicon
+    Daylatro.Constant.Font
+    Daylatro.Constant.Migration
+    Daylatro.Constant.Script
+    Daylatro.Constant.Shader
+    Daylatro.Constant.Style
+    Daylatro.Exception.InvalidOption
+    Daylatro.Exception.UnexpectedArgument
+    Daylatro.Exception.UnknownOption
+    Daylatro.Extra.Ord
+    Daylatro.Handler.Common
+    Daylatro.Handler.Feed.Get
+    Daylatro.Handler.Index.Get
+    Daylatro.Handler.Index.Post
+    Daylatro.Main
+    Daylatro.Server
+    Daylatro.Type.Config
+    Daylatro.Type.Context
+    Daylatro.Type.Flag
+    Daylatro.Type.Key
+    Daylatro.Type.Model
+    Daylatro.Type.Score
+    Daylatro.Type.Seed
+
+  hs-source-dirs: source/library
+  other-modules: PackageInfo_daylatro
+
+executable daylatro
+  import: executable
+  autogen-modules: PackageInfo_daylatro
+  hs-source-dirs: source/executable
+  main-is: Main.hs
+  other-modules: PackageInfo_daylatro
