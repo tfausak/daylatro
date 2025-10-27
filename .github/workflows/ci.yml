@@ -36,7 +36,7 @@ jobs:
       - run: cabal build
       - run: cp $( cabal list-bin daylatro ) artifact
       - run: tar --create --file artifact.tar --verbose artifact
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: daylatro-${{ github.sha }}
           path: artifact.tar
