@@ -26,7 +26,7 @@ jobs:
       - run: cabal freeze
       - run: cat cabal.project.freeze
       - run: cp cabal.project.freeze artifact
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           key: ${{ hashFiles('cabal.project.freeze') }}
           path: ~/.local/state/cabal
